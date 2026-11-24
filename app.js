@@ -96,6 +96,10 @@ function cleanPlan(p) {
     schedule: (Array.isArray(p.schedule) ? p.schedule : []).slice(0, 120).map((b, i) => ({
       block: num(b.block, i + 1), subskill: ids.has(b.subskill) ? b.subskill : subskills[0].id, focus: str(b.focus, 300),
     })),
+    cards: (Array.isArray(p.cards) ? p.cards : []).slice(0, 6).map((c) => ({
+      title: str(c.title, 80), ordered: c.ordered !== false,
+      items: (Array.isArray(c.items) ? c.items : []).slice(0, 24).map((x) => str(x, 300)).filter(Boolean),
+    })).filter((c) => c.title && c.items.length),
     feedback: (Array.isArray(p.feedback) ? p.feedback : []).slice(-20).map((f) => ({
       date: str(f.date, 30), summary: str(f.summary, 1500),
       actions: (Array.isArray(f.actions) ? f.actions : []).slice(0, 8).map((a) => str(a, 300)),
@@ -279,6 +283,9 @@ function spark(vals) {
   return lineChart(vals.map((v, i) => ({ v, label: `session ${i + 1}` })), { w: 120, ht: 36, mini: true, yLabel: 'metric trend' });
 }
 
+function cardList(c) { return h(c.ordered ? 'ol' : 'ul', {}, c.items.map((x) => h('li', {}, x))); }
+function cardEl(c) { return h('div', { class: 'card' }, h('h3', {}, c.title), cardList(c)); }
+
 // ---------- views ----------
 function go(view, planId) {
   state.view = view; if (planId !== undefined) state.planId = planId;
@@ -390,6 +397,9 @@ function viewDash(app, plan) {
     h('ul', {}, plan.resources.map((r) => h('li', {}, r.url ? h('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer' }, r.title) : r.title, h('div', { class: 'small muted' }, r.use))))));
   g2.append(h('div', { class: 'card' }, h('h3', {}, 'Barriers to remove before every session'), h('ul', {}, plan.barriers.map((b) => h('li', {}, b)))));
   app.append(g2);
+  if (plan.cards.length) app.append(h('div', { class: 'card print-cards' },
+    h('div', { class: 'row spread' }, h('h2', {}, 'Reference cards (the formats the drills use)'), h('button', { class: 'no-print', onclick: () => window.print() }, 'Print cards')),
+    h('div', { class: 'grid' }, plan.cards.map(cardEl))));
 
   app.append(h('details', { class: 'card' }, h('summary', {}, `Session log (${st.sessions.length})`),
     h('table', {}, h('tr', {}, ['Date', 'Block', 'Sub-skill', 'Min', 'Reps ✓/✗', 'Metric', 'Frus.', 'Distr.', 'Note'].map((t) => h('th', {}, t))),
@@ -429,7 +439,8 @@ function viewPre(app, plan) {
     st.nextBlock ? h('p', {}, h('strong', {}, 'Planned focus: '), st.nextBlock.focus) : null,
     fb && fb.actions.length ? h('div', { class: 'flag info' }, h('span', { class: 'ico' }, 'i'), h('span', {}, 'From your last review: ' + fb.actions[0])) : null,
     h('div', { class: 'grid' },
-      h('div', { class: 'card' }, h('label', {}, 'Sub-skill'), sel, h('label', {}, 'Minutes'), mins, drillBox),
+      h('div', { class: 'card' }, h('label', {}, 'Sub-skill'), sel, h('label', {}, 'Minutes'), mins, drillBox,
+        plan.cards.length ? plan.cards.map((c) => h('details', {}, h('summary', {}, c.title), cardList(c))) : null),
       h('div', { class: 'card' }, h('h2', {}, 'Remove barriers (step 3)'),
         plan.barriers.length ? plan.barriers.map((b, i) => h('label', { class: 'check' }, boxes[i], h('span', {}, b))) : h('p', { class: 'muted' }, 'No barriers listed in this plan.'),
         h('p', { class: 'small muted' }, 'Unticked items are logged and the coach will flag them.'), startBtn)));
@@ -478,6 +489,7 @@ function viewRun(app, plan) {
         h('div', { class: 'reps' }, h('button', { class: 'ok', onclick: () => rep(true) }, '✓ clean (j)'), h('button', { class: 'fail', onclick: () => rep(false) }, '✗ miss (k)')),
         sk.errorTags.length ? [h('p', { class: 'small muted' }, 'Tag a miss (pick before ✗):'), chips] : null, tally)),
     sk.selfCheck.length ? h('div', { class: 'card' }, h('h3', {}, 'Self-correction cues'), h('ul', {}, sk.selfCheck.map((c) => h('li', {}, c)))) : null,
+    plan.cards.length ? h('div', { class: 'grid' }, plan.cards.map((c) => h('details', { class: 'card', open: true }, h('summary', {}, c.title), cardList(c)))) : null,
     h('p', { class: 'small muted' }, 'Keys: ', h('kbd', {}, 'space'), ' pause · ', h('kbd', {}, 'j'), ' clean · ', h('kbd', {}, 'k'), ' miss · ', h('kbd', {}, '1-8'), ' tag · ', h('kbd', {}, 'd'), ' distraction'));
   timerHandle = setInterval(tick, 500);
 }
